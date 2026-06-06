@@ -1,0 +1,1763 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>交互模型贴图烘焙预览器</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef3fb;
+      --panel: rgba(255, 255, 255, .66);
+      --panel-2: rgba(255, 255, 255, .78);
+      --line: rgba(34, 45, 66, .12);
+      --text: #1b2433;
+      --muted: #687386;
+      --accent: #1fbf9a;
+      --accent-2: #3d7cff;
+      --danger: #e65353;
+      --shadow: 0 18px 54px rgba(48, 78, 128, .16);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 14%, rgba(84, 154, 255, .28), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(86, 214, 181, .24), transparent 28%),
+        linear-gradient(135deg, #f8fbff 0%, #e8f0fa 48%, #f4f7fb 100%);
+      color: var(--text);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 300px;
+      height: 100vh;
+    }
+
+    aside {
+      min-width: 0;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(26px) saturate(1.35);
+      overflow: auto;
+    }
+
+    .right {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .brand {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .7);
+      backdrop-filter: blur(28px) saturate(1.4);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .section {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #273244;
+    }
+
+    .drop {
+      display: grid;
+      place-items: center;
+      min-height: 118px;
+      padding: 14px;
+      border: 1px dashed rgba(61, 124, 255, .34);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .5);
+      text-align: center;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+      transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+
+    .drop:hover,
+    .drop.drag {
+      border-color: var(--accent);
+      background: rgba(236, 255, 248, .76);
+      transform: translateY(-1px);
+    }
+
+    .drop strong {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 14px;
+    }
+
+    .drop span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .row {
+      display: grid;
+      gap: 8px;
+      margin: 11px 0;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input[type="file"],
+    select,
+    input[type="color"],
+    input[type="number"] {
+      width: 100%;
+    }
+
+    select,
+    input[type="number"] {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .72);
+      color: var(--text);
+      padding: 0 10px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.65);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input[type="color"] {
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .74);
+      padding: 4px;
+    }
+
+    .button {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(55, 84, 130, .11), inset 0 1px 0 rgba(255,255,255,.78);
+      transition: transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(61, 124, 255, .34);
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 12px 30px rgba(55, 84, 130, .16), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+
+    .button.primary {
+      border-color: rgba(31, 191, 154, .42);
+      background: linear-gradient(180deg, rgba(39, 215, 172, .92), rgba(18, 169, 139, .92));
+      color: white;
+    }
+
+    .button.danger {
+      border-color: rgba(230, 83, 83, .28);
+      background: rgba(255, 241, 241, .78);
+      color: #b72f37;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .hint {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    main {
+      position: relative;
+      min-width: 0;
+      background:
+        linear-gradient(90deg, rgba(43, 60, 92, .08) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(43, 60, 92, .08) 1px, transparent 1px),
+        radial-gradient(circle at 50% 38%, #ffffff 0%, #dce8f8 66%, #cfdcec 100%);
+      background-size: 42px 42px, 42px 42px, cover;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .toolbar {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    .toolbar > * {
+      pointer-events: auto;
+    }
+
+    .pill {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 11px;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .68);
+      color: #273244;
+      backdrop-filter: blur(24px) saturate(1.45);
+      box-shadow: var(--shadow);
+      font-size: 12px;
+    }
+
+    .viewport-status {
+      margin-left: auto;
+      color: rgba(70, 82, 102, .78);
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      pointer-events: none;
+      text-align: center;
+    }
+
+    .empty-inner {
+      max-width: 460px;
+      color: rgba(70, 82, 102, .78);
+      line-height: 1.65;
+    }
+
+    .empty-inner strong {
+      display: block;
+      color: var(--text);
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .texture-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .keyframe-list {
+      display: grid;
+      gap: 8px;
+      max-height: 132px;
+      overflow: auto;
+    }
+
+    .tex {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .56);
+    }
+
+    .tex b {
+      display: block;
+      font-size: 12px;
+    }
+
+    .tex small {
+      display: block;
+      max-width: 170px;
+      overflow: hidden;
+      color: var(--muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+    }
+
+    .keyframe {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .56);
+      font-size: 12px;
+    }
+
+    .keyframe button {
+      min-height: 28px;
+      padding: 0 9px;
+    }
+
+    .swatch {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 6px;
+      background: rgba(235, 241, 250, .88);
+      object-fit: cover;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .56);
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .stat b {
+      display: block;
+      margin-top: 4px;
+      font-size: 15px;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%) translateY(16px);
+      max-width: min(560px, calc(100vw - 36px));
+      padding: 10px 14px;
+      border: 1px solid rgba(255,255,255,.42);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .86);
+      color: #273244;
+      opacity: 0;
+      transition: opacity .2s ease, transform .2s ease;
+      pointer-events: none;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 1040px) {
+      body { overflow: auto; }
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100vh;
+      }
+      aside,
+      .right {
+        border: 0;
+      }
+      main {
+        height: 62vh;
+        min-height: 440px;
+        order: -1;
+      }
+      .viewport-status {
+        margin-left: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        <h1>模型预览与贴图烘焙</h1>
+        <p>支持 GLB/GLTF/OBJ/FBX，FBX 的外部贴图可单独上传并自动匹配通道。</p>
+      </div>
+
+      <section class="section">
+        <h2>模型</h2>
+        <label class="drop" id="modelDrop">
+          <input class="hidden" id="modelInput" type="file" accept=".glb,.gltf,.obj,.fbx,.mtl,image/*,.bin" multiple />
+          <span>
+            <strong>上传或拖入模型</strong>
+            .glb / .gltf / .obj / .fbx / .mtl / 贴图
+          </span>
+        </label>
+        <input class="hidden" id="folderInput" type="file" webkitdirectory directory multiple />
+        <div class="button-row" style="margin-top: 10px;">
+          <button class="button" id="folderButton">资产文件夹</button>
+          <button class="button danger" id="clearButton">清空</button>
+        </div>
+        <button class="button" id="frameButton" style="width: 100%; margin-top: 8px;">居中</button>
+      </section>
+
+      <section class="section">
+        <h2>贴图</h2>
+        <div class="row">
+          <label>批量上传，自动识别 basecolor / normal / roughness / metalness / ao / emissive</label>
+          <input id="textureInput" type="file" accept="image/*" multiple />
+        </div>
+        <div class="texture-list" id="textureList"></div>
+      </section>
+
+      <section class="section">
+        <h2>手动通道</h2>
+        <div class="row">
+          <label>通道</label>
+          <select id="mapType">
+            <option value="map">Base Color</option>
+            <option value="normalMap">Normal</option>
+            <option value="roughnessMap">Roughness</option>
+            <option value="metalnessMap">Metalness</option>
+            <option value="aoMap">Ambient Occlusion</option>
+            <option value="emissiveMap">Emissive</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>选择图片</label>
+          <input id="singleTextureInput" type="file" accept="image/*" />
+        </div>
+      </section>
+    </aside>
+
+    <main id="viewport">
+      <div class="toolbar">
+        <button class="button pill" id="autoRotateButton">动画</button>
+        <button class="button pill" id="wireButton">线框</button>
+        <button class="button pill" id="gridButton">网格</button>
+        <button class="button pill" id="screenshotButton">截图</button>
+        <button class="button pill primary" id="bakeButton">烘焙贴图</button>
+        <span class="pill viewport-status" id="status">等待模型</span>
+      </div>
+      <div class="empty" id="empty">
+        <div class="empty-inner">
+          <strong>把模型拖进来</strong>
+          上传模型后可旋转、缩放、替换贴图，并把当前材质合成为一张可下载的烘焙预览贴图。
+        </div>
+      </div>
+      <div class="toast" id="toast"></div>
+    </main>
+
+    <aside class="right">
+      <div class="brand">
+        <h1>场景控制</h1>
+        <p>这些参数实时影响预览和截图，不会改动你的源模型文件。</p>
+      </div>
+
+      <section class="section">
+        <h2>材质</h2>
+        <div class="row">
+          <label>目标材质</label>
+          <select id="materialTarget">
+            <option value="all">全部材质</option>
+          </select>
+          <div class="hint">贴图、颜色、粗糙度、金属度会应用到选中的材质。</div>
+        </div>
+        <div class="row">
+          <label>基础颜色</label>
+          <input id="baseColor" type="color" value="#ffffff" />
+        </div>
+        <div class="row">
+          <label>粗糙度 <span id="roughnessValue">0.72</span></label>
+          <input id="roughness" type="range" min="0" max="1" step="0.01" value="0.72" />
+        </div>
+        <div class="row">
+          <label>金属度 <span id="metalnessValue">0.08</span></label>
+          <input id="metalness" type="range" min="0" max="1" step="0.01" value="0.08" />
+        </div>
+        <div class="row">
+          <label>法线强度 <span id="normalValue">1.00</span></label>
+          <input id="normalScale" type="range" min="0" max="2" step="0.01" value="1" />
+        </div>
+        <div class="row">
+          <label>法线贴图</label>
+          <input id="normalTextureInput" type="file" accept="image/*" />
+          <div class="button-row">
+            <button class="button" id="normalChannelButton">手动上传 Normal</button>
+            <button class="button danger" id="clearNormalButton">移除法线</button>
+          </div>
+          <div class="hint">没有法线贴图也可以预览，上传后会实时增强表面凹凸。</div>
+        </div>
+        <div class="row">
+          <label>法线格式</label>
+          <select id="normalConvention">
+            <option value="opengl" selected>OpenGL (+Y)</option>
+            <option value="directx">DirectX (-Y)</option>
+          </select>
+          <div class="hint">如果凹凸方向看起来反了，切换这个选项。</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>动画</h2>
+        <div class="row">
+          <label>动画模式</label>
+          <select id="animationMode">
+            <option value="yaw" selected>左右自转</option>
+            <option value="pitch">前后自转</option>
+            <option value="roll">翻滚自转</option>
+            <option value="swingYaw">左右摆动</option>
+            <option value="swingPitch">前后摆动</option>
+            <option value="custom">自定义曲线</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>速度 <span id="animationSpeedValue">0.80</span></label>
+          <input id="animationSpeed" type="range" min="0.05" max="3" step="0.01" value="0.8" />
+        </div>
+        <div class="row">
+          <label>曲线</label>
+          <select id="curveStyle">
+            <option value="sine" selected>正弦循环</option>
+            <option value="ease">缓入缓出</option>
+            <option value="pulse">脉冲回弹</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>X 前后幅度 <span id="curveXValue">18</span>°</label>
+          <input id="curveX" type="range" min="0" max="90" step="1" value="18" />
+        </div>
+        <div class="row">
+          <label>Y 左右幅度 <span id="curveYValue">35</span>°</label>
+          <input id="curveY" type="range" min="0" max="180" step="1" value="35" />
+        </div>
+        <div class="row">
+          <label>Z 倾斜幅度 <span id="curveZValue">8</span>°</label>
+          <input id="curveZ" type="range" min="0" max="90" step="1" value="8" />
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>内置动画</h2>
+        <div class="row">
+          <label>动画片段</label>
+          <select id="clipSelect">
+            <option value="">无内置动画</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>播放速度 <span id="clipSpeedValue">1.00</span></label>
+          <input id="clipSpeed" type="range" min="0.05" max="3" step="0.01" value="1" />
+        </div>
+        <div class="button-row">
+          <button class="button primary" id="playClipButton">播放</button>
+          <button class="button" id="stopClipButton">停止</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>关键帧</h2>
+        <div class="row">
+          <label>时间点 <span id="keyframeTimeValue">0.00</span>s</label>
+          <input id="keyframeTime" type="range" min="0" max="6" step="0.1" value="0" />
+        </div>
+        <div class="button-row">
+          <button class="button primary" id="addKeyframeButton">捕获姿态</button>
+          <button class="button" id="playKeyframesButton">播放时间轴</button>
+        </div>
+        <button class="button danger" id="clearKeyframesButton" style="width: 100%; margin-top: 8px;">清空关键帧</button>
+        <div class="keyframe-list" id="keyframeList" style="margin-top: 10px;"></div>
+      </section>
+
+      <section class="section">
+        <h2>灯光</h2>
+        <div class="row">
+          <label>环境光 <span id="ambientValue">1.20</span></label>
+          <input id="ambient" type="range" min="0" max="3" step="0.01" value="1.2" />
+        </div>
+        <div class="row">
+          <label>主光 <span id="keyValue">3.60</span></label>
+          <input id="keyLight" type="range" min="0" max="8" step="0.01" value="3.6" />
+        </div>
+        <div class="row">
+          <label>天空盒</label>
+          <select id="backgroundMode">
+            <option value="hyper" selected>澎湃蓝</option>
+            <option value="sunrise">日出云</option>
+            <option value="aurora">极光夜</option>
+            <option value="studio">暖白棚拍</option>
+            <option value="transparent">Transparent</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>烘焙设置</h2>
+        <div class="row">
+          <label>输出尺寸</label>
+          <select id="bakeSize">
+            <option value="1024">1024 x 1024</option>
+            <option value="2048" selected>2048 x 2048</option>
+            <option value="4096">4096 x 4096</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>AO 强度 <span id="aoValue">0.45</span></label>
+          <input id="aoStrength" type="range" min="0" max="1" step="0.01" value="0.45" />
+        </div>
+        <button class="button primary" id="downloadBakeButton">下载上次烘焙</button>
+      </section>
+
+      <section class="section">
+        <h2>模型信息</h2>
+        <div class="stats">
+          <div class="stat"><span>网格</span><b id="meshCount">0</b></div>
+          <div class="stat"><span>三角面</span><b id="triCount">0</b></div>
+          <div class="stat"><span>材质</span><b id="matCount">0</b></div>
+          <div class="stat"><span>贴图</span><b id="texCount">0</b></div>
+          <div class="stat"><span>动画</span><b id="clipCount">0</b></div>
+          <div class="stat"><span>关键帧</span><b id="keyframeCount">0</b></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+    import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+    import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+
+    const viewport = document.querySelector('#viewport');
+    const empty = document.querySelector('#empty');
+    const statusEl = document.querySelector('#status');
+    const toastEl = document.querySelector('#toast');
+    const modelDrop = document.querySelector('#modelDrop');
+    const modelInput = document.querySelector('#modelInput');
+    const folderInput = document.querySelector('#folderInput');
+    const textureInput = document.querySelector('#textureInput');
+    const singleTextureInput = document.querySelector('#singleTextureInput');
+    const normalTextureInput = document.querySelector('#normalTextureInput');
+    const textureList = document.querySelector('#textureList');
+
+    const controlsEl = {
+      materialTarget: document.querySelector('#materialTarget'),
+      baseColor: document.querySelector('#baseColor'),
+      roughness: document.querySelector('#roughness'),
+      metalness: document.querySelector('#metalness'),
+      normalScale: document.querySelector('#normalScale'),
+      normalConvention: document.querySelector('#normalConvention'),
+      animationMode: document.querySelector('#animationMode'),
+      animationSpeed: document.querySelector('#animationSpeed'),
+      curveStyle: document.querySelector('#curveStyle'),
+      curveX: document.querySelector('#curveX'),
+      curveY: document.querySelector('#curveY'),
+      curveZ: document.querySelector('#curveZ'),
+      clipSelect: document.querySelector('#clipSelect'),
+      clipSpeed: document.querySelector('#clipSpeed'),
+      keyframeTime: document.querySelector('#keyframeTime'),
+      ambient: document.querySelector('#ambient'),
+      keyLight: document.querySelector('#keyLight'),
+      backgroundMode: document.querySelector('#backgroundMode'),
+      bakeSize: document.querySelector('#bakeSize'),
+      aoStrength: document.querySelector('#aoStrength'),
+    };
+
+    const readouts = {
+      roughness: document.querySelector('#roughnessValue'),
+      metalness: document.querySelector('#metalnessValue'),
+      normalScale: document.querySelector('#normalValue'),
+      animationSpeed: document.querySelector('#animationSpeedValue'),
+      curveX: document.querySelector('#curveXValue'),
+      curveY: document.querySelector('#curveYValue'),
+      curveZ: document.querySelector('#curveZValue'),
+      clipSpeed: document.querySelector('#clipSpeedValue'),
+      keyframeTime: document.querySelector('#keyframeTimeValue'),
+      ambient: document.querySelector('#ambientValue'),
+      keyLight: document.querySelector('#keyValue'),
+      aoStrength: document.querySelector('#aoValue'),
+      meshCount: document.querySelector('#meshCount'),
+      triCount: document.querySelector('#triCount'),
+      matCount: document.querySelector('#matCount'),
+      texCount: document.querySelector('#texCount'),
+      clipCount: document.querySelector('#clipCount'),
+      keyframeCount: document.querySelector('#keyframeCount'),
+    };
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    viewport.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 0.01, 5000);
+    camera.position.set(3, 2, 4);
+
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+    orbit.dampingFactor = 0.05;
+    orbit.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.PAN,
+    };
+    renderer.domElement.addEventListener('auxclick', (event) => event.preventDefault());
+    renderer.domElement.addEventListener('mousedown', (event) => {
+      if (event.button === 1) event.preventDefault();
+    });
+
+    const ambientLight = new THREE.HemisphereLight(0xffffff, 0x334455, Number(controlsEl.ambient.value));
+    scene.add(ambientLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, Number(controlsEl.keyLight.value));
+    keyLight.position.set(4, 5, 3);
+    scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0xaed8ff, 1.1);
+    fillLight.position.set(-4, 2, -3);
+    scene.add(fillLight);
+
+    const grid = new THREE.GridHelper(12, 24, 0x7f8796, 0x363b45);
+    grid.position.y = -0.001;
+    scene.add(grid);
+
+    let currentModel = null;
+    let currentModelExt = '';
+    let lastBakeUrl = '';
+    let isAutoRotate = false;
+    let isWireframe = false;
+    let textureSlots = new Map();
+    let materialRegistry = [];
+    let assetUrls = new Map();
+    let assetFiles = new Map();
+    let currentClips = [];
+    let currentMixer = null;
+    let currentClipAction = null;
+    let keyframes = [];
+    let keyframePlaying = false;
+    let keyframePlayhead = 0;
+    const skyTextures = new Map();
+    const baseRotation = new THREE.Euler();
+    const clock = new THREE.Clock();
+    let animationTime = 0;
+
+    const textureLoader = new THREE.TextureLoader();
+    const manager = new THREE.LoadingManager();
+    const gltfLoader = new GLTFLoader(manager);
+    const objLoader = new OBJLoader(manager);
+    const mtlLoader = new MTLLoader(manager);
+    const fbxLoader = new FBXLoader(manager);
+
+    manager.setURLModifier((url) => {
+      const clean = decodeURIComponent(url).replace(/\\/g, '/').split(/[?#]/)[0];
+      const key = clean.toLowerCase();
+      const base = clean.split('/').pop()?.toLowerCase();
+      return assetUrls.get(key) || assetUrls.get(base) || url;
+    });
+
+    const slotLabels = {
+      map: 'Base Color',
+      normalMap: 'Normal',
+      roughnessMap: 'Roughness',
+      metalnessMap: 'Metalness',
+      aoMap: 'AO',
+      emissiveMap: 'Emissive',
+    };
+
+    const slotMatchers = [
+      ['normalMap', /(normal|normalgl|normaldx|norm|nrm|[_\-. ]nm[_\-. ]|bump)/i],
+      ['roughnessMap', /(rough|roughness|rgh)/i],
+      ['metalnessMap', /(metal|metallic|metalness|mtl)/i],
+      ['aoMap', /(^|[_\-. ])(ao|ambient.?occlusion|occlusion)([_\-. ]|$)/i],
+      ['emissiveMap', /(emissive|emission|emit|glow)/i],
+      ['map', /(base.?color|basecolor|albedo|diffuse|color|col)/i],
+    ];
+
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add('show');
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toastEl.classList.remove('show'), 2800);
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function updateReadouts() {
+      readouts.roughness.textContent = Number(controlsEl.roughness.value).toFixed(2);
+      readouts.metalness.textContent = Number(controlsEl.metalness.value).toFixed(2);
+      readouts.normalScale.textContent = Number(controlsEl.normalScale.value).toFixed(2);
+      readouts.animationSpeed.textContent = Number(controlsEl.animationSpeed.value).toFixed(2);
+      readouts.curveX.textContent = controlsEl.curveX.value;
+      readouts.curveY.textContent = controlsEl.curveY.value;
+      readouts.curveZ.textContent = controlsEl.curveZ.value;
+      readouts.clipSpeed.textContent = Number(controlsEl.clipSpeed.value).toFixed(2);
+      readouts.keyframeTime.textContent = Number(controlsEl.keyframeTime.value).toFixed(2);
+      readouts.ambient.textContent = Number(controlsEl.ambient.value).toFixed(2);
+      readouts.keyLight.textContent = Number(controlsEl.keyLight.value).toFixed(2);
+      readouts.aoStrength.textContent = Number(controlsEl.aoStrength.value).toFixed(2);
+    }
+
+    function assignUv2(geometry) {
+      if (!geometry.attributes.uv || geometry.attributes.uv2) return;
+      geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
+    }
+
+    function materialsOf(object) {
+      const materials = new Set();
+      object?.traverse((node) => {
+        if (!node.isMesh) return;
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.filter(Boolean).forEach((mat) => materials.add(mat));
+      });
+      return [...materials];
+    }
+
+    function selectedMaterialKey() {
+      return controlsEl.materialTarget.value || 'all';
+    }
+
+    function textureSlotKey(slot) {
+      return `${selectedMaterialKey()}:${slot}`;
+    }
+
+    function textureSlotItem(slot) {
+      return textureSlots.get(textureSlotKey(slot)) || textureSlots.get(`all:${slot}`);
+    }
+
+    function targetMaterials() {
+      const target = selectedMaterialKey();
+      const materials = materialsOf(currentModel);
+      if (target === 'all') return materials;
+      return materials.filter((mat) => mat.userData.viewerMaterialId === target);
+    }
+
+    function refreshMaterialTargets() {
+      materialRegistry = materialsOf(currentModel).map((mat, index) => {
+        if (!mat.userData.viewerMaterialId) mat.userData.viewerMaterialId = `mat-${index + 1}`;
+        const name = mat.name || mat.userData.viewerName || `材质 ${index + 1}`;
+        mat.userData.viewerName = name;
+        return { id: mat.userData.viewerMaterialId, name };
+      });
+      const current = controlsEl.materialTarget.value;
+      controlsEl.materialTarget.innerHTML = '<option value="all">全部材质</option>';
+      materialRegistry.forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.name;
+        controlsEl.materialTarget.appendChild(option);
+      });
+      if ([...controlsEl.materialTarget.options].some((option) => option.value === current)) {
+        controlsEl.materialTarget.value = current;
+      }
+      renderTextureList();
+    }
+
+    function eachMesh(callback) {
+      currentModel?.traverse((node) => {
+        if (node.isMesh) callback(node);
+      });
+    }
+
+    function fileKey(file) {
+      return (file.webkitRelativePath || file.name).replace(/\\/g, '/').toLowerCase();
+    }
+
+    function clearAssetUrls() {
+      assetUrls.forEach((url) => URL.revokeObjectURL(url));
+      assetUrls.clear();
+      assetFiles.clear();
+    }
+
+    function registerAssetFiles(files) {
+      clearAssetUrls();
+      [...files].forEach((file) => {
+        const key = fileKey(file);
+        const base = file.name.toLowerCase();
+        const url = URL.createObjectURL(file);
+        assetFiles.set(key, file);
+        assetFiles.set(base, file);
+        assetUrls.set(key, url);
+        assetUrls.set(base, url);
+      });
+    }
+
+    function extensionOf(file) {
+      return file.name.split('.').pop().toLowerCase();
+    }
+
+    function chooseModelFile(files) {
+      const list = [...files];
+      return list.find((file) => /\.glb$/i.test(file.name))
+        || list.find((file) => /\.gltf$/i.test(file.name))
+        || list.find((file) => /\.fbx$/i.test(file.name))
+        || list.find((file) => /\.obj$/i.test(file.name));
+    }
+
+    function chooseMtlForObj(objFile) {
+      const objBase = objFile.name.replace(/\.[^.]+$/, '').toLowerCase();
+      const candidates = [...new Set(assetFiles.values())].filter((file) => /\.mtl$/i.test(file.name));
+      return candidates.find((file) => file.name.replace(/\.[^.]+$/, '').toLowerCase() === objBase) || candidates[0] || null;
+    }
+
+    function setClips(clips) {
+      currentClips = clips || [];
+      controlsEl.clipSelect.innerHTML = '';
+      if (!currentClips.length) {
+        controlsEl.clipSelect.innerHTML = '<option value="">无内置动画</option>';
+      } else {
+        currentClips.forEach((clip, index) => {
+          const option = document.createElement('option');
+          option.value = String(index);
+          option.textContent = clip.name || `动画 ${index + 1}`;
+          controlsEl.clipSelect.appendChild(option);
+        });
+      }
+      readouts.clipCount.textContent = currentClips.length;
+    }
+
+    function normalizeMaterial(material) {
+      if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) return material;
+      const converted = new THREE.MeshStandardMaterial({
+        color: material.color || new THREE.Color(0xffffff),
+        map: material.map || null,
+        roughness: Number(controlsEl.roughness.value),
+        metalness: Number(controlsEl.metalness.value),
+      });
+      material.dispose?.();
+      return converted;
+    }
+
+    function prepareModel(root) {
+      root.traverse((node) => {
+        if (!node.isMesh) return;
+        node.castShadow = true;
+        node.receiveShadow = true;
+        assignUv2(node.geometry);
+        if (Array.isArray(node.material)) {
+          node.material = node.material.map(normalizeMaterial);
+        } else {
+          node.material = normalizeMaterial(node.material || new THREE.MeshStandardMaterial());
+        }
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.filter(Boolean).forEach((mat) => {
+          mat.userData.originalColor = mat.color?.clone?.() || new THREE.Color(0xffffff);
+        });
+      });
+      return root;
+    }
+
+    function applyMaterialControls() {
+      const color = new THREE.Color(controlsEl.baseColor.value);
+      const isDefaultColor = controlsEl.baseColor.value.toLowerCase() === '#ffffff';
+      targetMaterials().forEach((mat) => {
+        mat.color.copy(isDefaultColor ? (mat.userData.originalColor || color) : color);
+        mat.roughness = Number(controlsEl.roughness.value);
+        mat.metalness = Number(controlsEl.metalness.value);
+        mat.wireframe = isWireframe;
+        if (mat.normalScale) {
+          const normalStrength = Number(controlsEl.normalScale.value);
+          const normalY = controlsEl.normalConvention.value === 'directx' ? -normalStrength : normalStrength;
+          mat.normalScale.set(normalStrength, normalY);
+        }
+        mat.needsUpdate = true;
+      });
+      ambientLight.intensity = Number(controlsEl.ambient.value);
+      keyLight.intensity = Number(controlsEl.keyLight.value);
+      updateReadouts();
+    }
+
+    function applyTexture(slot, texture, fileName) {
+      if (!currentModel) {
+        showToast('先上传模型，再贴图。');
+        return;
+      }
+      if (slot === 'map' || slot === 'emissiveMap') {
+        texture.colorSpace = THREE.SRGBColorSpace;
+      } else {
+        texture.colorSpace = THREE.NoColorSpace;
+      }
+      texture.flipY = currentModelExt === 'glb' || currentModelExt === 'gltf' ? false : true;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      texture.userData.fileName = fileName;
+
+      targetMaterials().forEach((mat) => {
+        mat[slot] = texture;
+        if (slot === 'emissiveMap') mat.emissive = new THREE.Color(0xffffff);
+        if (slot === 'aoMap') mat.aoMapIntensity = 1;
+        if (slot === 'normalMap' && mat.normalScale) {
+          const normalStrength = Number(controlsEl.normalScale.value);
+          const normalY = controlsEl.normalConvention.value === 'directx' ? -normalStrength : normalStrength;
+          mat.normalScale.set(normalStrength, normalY);
+        }
+        mat.needsUpdate = true;
+      });
+      textureSlots.set(textureSlotKey(slot), { texture, fileName });
+      renderTextureList();
+      updateStats();
+      showToast(`${slotLabels[slot]} 已应用：${fileName}`);
+    }
+
+    function removeTexture(slot) {
+      if (!currentModel) {
+        showToast('先上传模型。');
+        return;
+      }
+      targetMaterials().forEach((mat) => {
+        if (mat[slot]) mat[slot] = null;
+        mat.needsUpdate = true;
+      });
+      textureSlots.delete(textureSlotKey(slot));
+      renderTextureList();
+      updateStats();
+      showToast(`${slotLabels[slot]} 已移除。`);
+    }
+
+    function guessSlot(fileName) {
+      const match = slotMatchers.find(([, regex]) => regex.test(fileName));
+      return match ? match[0] : 'map';
+    }
+
+    function loadTextureFile(file, forcedSlot) {
+      const url = URL.createObjectURL(file);
+      textureLoader.load(url, (texture) => {
+        applyTexture(forcedSlot || guessSlot(file.name), texture, file.name);
+        URL.revokeObjectURL(url);
+      }, undefined, (error) => {
+        console.error(error);
+        showToast(`贴图读取失败：${file.name}`);
+      });
+    }
+
+    function renderTextureList() {
+      textureList.innerHTML = '';
+      Object.entries(slotLabels).forEach(([slot, label]) => {
+        const item = textureSlots.get(textureSlotKey(slot)) || textureSlots.get(`all:${slot}`);
+        const row = document.createElement('div');
+        row.className = 'tex';
+        const img = document.createElement(item ? 'img' : 'div');
+        img.className = 'swatch';
+        if (item) img.src = item.texture.image?.src || '';
+        row.innerHTML = `<div><b>${label}</b><small>${item ? item.fileName : '未设置'}</small></div>`;
+        row.appendChild(img);
+        textureList.appendChild(row);
+      });
+    }
+
+    function clearModel(options = {}) {
+      if (currentClipAction) currentClipAction.stop();
+      currentClipAction = null;
+      currentMixer = null;
+      currentClips = [];
+      setClips([]);
+      if (currentModel) {
+        scene.remove(currentModel);
+        currentModel.traverse((node) => {
+          if (node.isMesh) {
+            node.geometry?.dispose?.();
+            const mats = Array.isArray(node.material) ? node.material : [node.material];
+            mats.filter(Boolean).forEach((mat) => mat.dispose?.());
+          }
+        });
+      }
+      currentModel = null;
+      currentModelExt = '';
+      baseRotation.set(0, 0, 0);
+      animationTime = 0;
+      textureSlots.clear();
+      materialRegistry = [];
+      controlsEl.materialTarget.innerHTML = '<option value="all">全部材质</option>';
+      controlsEl.materialTarget.value = 'all';
+      keyframes = [];
+      keyframePlaying = false;
+      keyframePlayhead = 0;
+      if (!options.keepAssets) clearAssetUrls();
+      empty.style.display = 'grid';
+      setStatus('等待模型');
+      updateStats();
+      renderTextureList();
+    }
+
+    function frameModel() {
+      if (!currentModel) return;
+      const box = new THREE.Box3().setFromObject(currentModel);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z) || 1;
+      currentModel.position.sub(center);
+      const fitDistance = maxSize / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      camera.position.set(fitDistance * 0.82, fitDistance * 0.58, fitDistance * 1.05);
+      camera.near = Math.max(0.001, fitDistance / 100);
+      camera.far = fitDistance * 100;
+      camera.updateProjectionMatrix();
+      orbit.target.set(0, 0, 0);
+      orbit.update();
+      grid.position.y = -size.y / 2;
+      grid.scale.setScalar(Math.max(1, maxSize / 4));
+      baseRotation.copy(currentModel.rotation);
+    }
+
+    function finalizeLoadedModel(model, clips, ext, name) {
+      currentModel = model;
+      currentModelExt = ext;
+      prepareModel(currentModel);
+      scene.add(currentModel);
+      setClips(clips);
+      currentMixer = currentClips.length ? new THREE.AnimationMixer(currentModel) : null;
+      refreshMaterialTargets();
+      applyMaterialControls();
+      frameModel();
+      updateStats();
+      empty.style.display = 'none';
+      setStatus(name);
+      showToast(currentClips.length ? `模型已加载，发现 ${currentClips.length} 个内置动画。` : '模型已加载。');
+    }
+
+    async function loadObjWithOptionalMtl(modelFile, url) {
+      const loader = new OBJLoader(manager);
+      const mtlFile = chooseMtlForObj(modelFile);
+      if (mtlFile) {
+        const text = await mtlFile.text();
+        const materials = mtlLoader.parse(text, '');
+        materials.preload();
+        loader.setMaterials(materials);
+      }
+      return loader.loadAsync(url);
+    }
+
+    async function loadModelFromAssets(modelFile) {
+      const ext = extensionOf(modelFile);
+      const url = assetUrls.get(fileKey(modelFile)) || assetUrls.get(modelFile.name.toLowerCase()) || URL.createObjectURL(modelFile);
+      setStatus(`读取 ${modelFile.name}`);
+      clearModel({ keepAssets: true });
+      try {
+        let loaded;
+        if (ext === 'glb' || ext === 'gltf') {
+          loaded = await gltfLoader.loadAsync(url);
+          finalizeLoadedModel(loaded.scene, loaded.animations || [], ext, modelFile.name);
+        } else if (ext === 'obj') {
+          loaded = await loadObjWithOptionalMtl(modelFile, url);
+          finalizeLoadedModel(loaded, [], ext, modelFile.name);
+        } else if (ext === 'fbx') {
+          loaded = await fbxLoader.loadAsync(url);
+          finalizeLoadedModel(loaded, loaded.animations || [], ext, modelFile.name);
+        } else {
+          throw new Error('不支持的模型格式');
+        }
+      } catch (error) {
+        console.error(error);
+        setStatus('读取失败');
+        showToast(`模型读取失败：${error.message || modelFile.name}`);
+      }
+    }
+
+    async function loadAssetBundle(files) {
+      const list = [...files];
+      const modelFile = chooseModelFile(list);
+      if (!modelFile) {
+        list.filter((file) => file.type.startsWith('image/')).forEach((file) => loadTextureFile(file));
+        showToast('没有找到模型文件，已尝试按贴图处理。');
+        return;
+      }
+      registerAssetFiles(list);
+      await loadModelFromAssets(modelFile);
+      const textureFiles = list.filter((file) => file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name));
+      const autoCount = textureFiles.length;
+      const objHasMtl = currentModelExt === 'obj' && chooseMtlForObj(modelFile);
+      if (autoCount && (currentModelExt === 'fbx' || (currentModelExt === 'obj' && !objHasMtl))) {
+        textureFiles.forEach((file) => loadTextureFile(file));
+      }
+    }
+
+    function updateStats() {
+      let meshes = 0;
+      let triangles = 0;
+      const materials = new Set();
+      eachMesh((mesh) => {
+        meshes += 1;
+        const pos = mesh.geometry?.attributes?.position;
+        triangles += mesh.geometry?.index ? mesh.geometry.index.count / 3 : (pos ? pos.count / 3 : 0);
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.filter(Boolean).forEach((mat) => materials.add(mat));
+      });
+      readouts.meshCount.textContent = meshes;
+      readouts.triCount.textContent = Math.round(triangles).toLocaleString();
+      readouts.matCount.textContent = materials.size;
+      readouts.texCount.textContent = textureSlots.size;
+      readouts.keyframeCount.textContent = keyframes.length;
+    }
+
+    function paintCloud(ctx, x, y, radius, color, alpha) {
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      gradient.addColorStop(0, color.replace('ALPHA', alpha));
+      gradient.addColorStop(1, color.replace('ALPHA', '0'));
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function createSkyTexture(mode) {
+      if (skyTextures.has(mode)) return skyTextures.get(mode);
+      const canvas = document.createElement('canvas');
+      canvas.width = 2048;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+      const presets = {
+        hyper: ['#eaf5ff', '#b8dcff', '#f8fbff', '#79d7c2'],
+        sunrise: ['#fff0d9', '#f7b56c', '#b7dcff', '#fff8ee'],
+        aurora: ['#081421', '#11203b', '#051018', '#37e2b4'],
+        studio: ['#ffffff', '#e8edf5', '#f7f9fc', '#dce5f2'],
+      };
+      const [top, mid, bottom, glow] = presets[mode] || presets.hyper;
+      const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      sky.addColorStop(0, top);
+      sky.addColorStop(.44, mid);
+      sky.addColorStop(1, bottom);
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const horizon = ctx.createLinearGradient(0, canvas.height * .38, 0, canvas.height);
+      horizon.addColorStop(0, 'rgba(255,255,255,0)');
+      horizon.addColorStop(.52, 'rgba(255,255,255,.42)');
+      horizon.addColorStop(1, 'rgba(255,255,255,.08)');
+      ctx.fillStyle = horizon;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (mode === 'aurora') {
+        for (let i = 0; i < 5; i += 1) {
+          ctx.save();
+          ctx.translate(canvas.width * (.16 + i * .18), canvas.height * .18);
+          ctx.rotate((-14 + i * 7) * Math.PI / 180);
+          const ribbon = ctx.createLinearGradient(0, 0, 0, canvas.height * .45);
+          ribbon.addColorStop(0, 'rgba(70,255,190,0)');
+          ribbon.addColorStop(.45, 'rgba(70,255,190,.34)');
+          ribbon.addColorStop(1, 'rgba(88,136,255,0)');
+          ctx.fillStyle = ribbon;
+          ctx.fillRect(-80, 0, 160, canvas.height * .62);
+          ctx.restore();
+        }
+      } else {
+        const cloudColor = mode === 'sunrise' ? 'rgba(255,244,226,ALPHA)' : 'rgba(255,255,255,ALPHA)';
+        for (let i = 0; i < 22; i += 1) {
+          const x = (i * 313) % canvas.width;
+          const y = canvas.height * (.44 + ((i * 37) % 140) / 1000);
+          const r = 130 + ((i * 29) % 120);
+          paintCloud(ctx, x, y, r, cloudColor, String(.12 + (i % 4) * .035));
+        }
+      }
+
+      const light = ctx.createRadialGradient(canvas.width * .68, canvas.height * .32, 0, canvas.width * .68, canvas.height * .32, canvas.width * .34);
+      light.addColorStop(0, `${glow}aa`);
+      light.addColorStop(1, `${glow}00`);
+      ctx.fillStyle = light;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      skyTextures.set(mode, texture);
+      return texture;
+    }
+
+    function setBackground(mode) {
+      if (mode === 'transparent') {
+        scene.background = null;
+        scene.environment = null;
+        renderer.setClearColor(0x000000, 0);
+        viewport.style.background = 'linear-gradient(135deg, rgba(247,250,255,.92), rgba(219,231,248,.92))';
+        fillLight.color.set(0xaed8ff);
+        return;
+      }
+      const texture = createSkyTexture(mode);
+      scene.background = texture;
+      scene.environment = texture;
+      renderer.setClearColor(0xf7fbff, 1);
+      const cssBackgrounds = {
+        hyper: 'radial-gradient(circle at 68% 24%, rgba(113, 215, 194, .36), transparent 28%), linear-gradient(135deg, #f8fbff, #d9eafd 58%, #f6fbff)',
+        sunrise: 'radial-gradient(circle at 70% 30%, rgba(255, 187, 109, .38), transparent 28%), linear-gradient(135deg, #fff9f0, #dceeff 62%, #fff5ea)',
+        aurora: 'radial-gradient(circle at 50% 18%, rgba(55, 226, 180, .24), transparent 30%), linear-gradient(135deg, #081421, #13223e 52%, #07111d)',
+        studio: 'linear-gradient(135deg, #ffffff, #e9eef6 64%, #f8fafc)',
+      };
+      viewport.style.background = cssBackgrounds[mode] || cssBackgrounds.hyper;
+      fillLight.color.set(mode === 'sunrise' ? 0xffd3a3 : mode === 'aurora' ? 0x63ffd1 : 0xaed8ff);
+    }
+
+    function makeBakeTexture() {
+      const size = Number(controlsEl.bakeSize.value);
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = controlsEl.baseColor.value;
+      ctx.fillRect(0, 0, size, size);
+
+      const base = textureSlotItem('map')?.texture?.image;
+      if (base) ctx.drawImage(base, 0, 0, size, size);
+
+      const ao = textureSlotItem('aoMap')?.texture?.image;
+      if (ao) {
+        ctx.save();
+        ctx.globalAlpha = Number(controlsEl.aoStrength.value);
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(ao, 0, 0, size, size);
+        ctx.restore();
+      } else {
+        const grad = ctx.createRadialGradient(size * .5, size * .45, size * .1, size * .5, size * .5, size * .74);
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(1, `rgba(0,0,0,${Number(controlsEl.aoStrength.value)})`);
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.globalAlpha = .18;
+      ctx.globalCompositeOperation = 'overlay';
+      for (let y = 0; y < size; y += 4) {
+        for (let x = 0; x < size; x += 4) {
+          const value = 122 + Math.random() * 28;
+          ctx.fillStyle = `rgb(${value},${value},${value})`;
+          ctx.fillRect(x, y, 4, 4);
+        }
+      }
+      ctx.restore();
+      return canvas;
+    }
+
+    function bakeTexture() {
+      if (!currentModel) {
+        showToast('先上传模型。');
+        return;
+      }
+      const canvas = makeBakeTexture();
+      if (lastBakeUrl) URL.revokeObjectURL(lastBakeUrl);
+      canvas.toBlob((blob) => {
+        lastBakeUrl = URL.createObjectURL(blob);
+        textureLoader.load(lastBakeUrl, (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.flipY = false;
+          applyTexture('map', texture, 'baked-preview.png');
+          showToast('已生成烘焙预览贴图，可下载 PNG。');
+        });
+      }, 'image/png');
+    }
+
+    function download(url, fileName) {
+      if (!url) return;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    function screenshot() {
+      renderer.render(scene, camera);
+      const url = renderer.domElement.toDataURL('image/png');
+      download(url, 'model-screenshot.png');
+    }
+
+    function wireframeToggle() {
+      isWireframe = !isWireframe;
+      applyMaterialControls();
+      showToast(isWireframe ? '线框已开启。' : '线框已关闭。');
+    }
+
+    function curveValue(t, style) {
+      const sine = Math.sin(t);
+      if (style === 'ease') {
+        return Math.sign(sine) * (1 - Math.cos(Math.abs(sine) * Math.PI / 2));
+      }
+      if (style === 'pulse') {
+        return Math.sin(t) * (0.64 + 0.36 * Math.sin(t * 3));
+      }
+      return sine;
+    }
+
+    function applyModelAnimation(delta) {
+      if (!currentModel || !isAutoRotate || keyframePlaying) return;
+      const speed = Number(controlsEl.animationSpeed.value);
+      const mode = controlsEl.animationMode.value;
+      animationTime += delta * speed;
+
+      if (mode === 'yaw') {
+        currentModel.rotation.y += delta * speed;
+        baseRotation.copy(currentModel.rotation);
+        return;
+      }
+      if (mode === 'pitch') {
+        currentModel.rotation.x += delta * speed;
+        baseRotation.copy(currentModel.rotation);
+        return;
+      }
+      if (mode === 'roll') {
+        currentModel.rotation.z += delta * speed;
+        baseRotation.copy(currentModel.rotation);
+        return;
+      }
+
+      const style = controlsEl.curveStyle.value;
+      const xAmp = THREE.MathUtils.degToRad(Number(controlsEl.curveX.value));
+      const yAmp = THREE.MathUtils.degToRad(Number(controlsEl.curveY.value));
+      const zAmp = THREE.MathUtils.degToRad(Number(controlsEl.curveZ.value));
+
+      if (mode === 'swingYaw') {
+        currentModel.rotation.set(baseRotation.x, baseRotation.y + curveValue(animationTime, style) * yAmp, baseRotation.z);
+        return;
+      }
+      if (mode === 'swingPitch') {
+        currentModel.rotation.set(baseRotation.x + curveValue(animationTime, style) * xAmp, baseRotation.y, baseRotation.z);
+        return;
+      }
+      currentModel.rotation.set(
+        baseRotation.x + curveValue(animationTime, style) * xAmp,
+        baseRotation.y + curveValue(animationTime + Math.PI / 2, style) * yAmp,
+        baseRotation.z + curveValue(animationTime * .72 + Math.PI / 3, style) * zAmp
+      );
+    }
+
+    function playSelectedClip() {
+      if (!currentMixer || !currentClips.length) {
+        showToast('当前模型没有内置动画。');
+        return;
+      }
+      const index = Number(controlsEl.clipSelect.value || 0);
+      const clip = currentClips[index];
+      if (!clip) return;
+      if (currentClipAction) currentClipAction.fadeOut(0.12);
+      currentClipAction = currentMixer.clipAction(clip);
+      currentClipAction.reset();
+      currentClipAction.setEffectiveTimeScale(Number(controlsEl.clipSpeed.value));
+      currentClipAction.setEffectiveWeight(1);
+      currentClipAction.fadeIn(0.12).play();
+      showToast(`播放内置动画：${clip.name || `动画 ${index + 1}`}`);
+    }
+
+    function stopSelectedClip() {
+      if (currentClipAction) {
+        currentClipAction.stop();
+        currentClipAction = null;
+      }
+      showToast('内置动画已停止。');
+    }
+
+    function sortedKeyframes() {
+      return [...keyframes].sort((a, b) => a.time - b.time);
+    }
+
+    function renderKeyframeList() {
+      const list = document.querySelector('#keyframeList');
+      list.innerHTML = '';
+      sortedKeyframes().forEach((frame, index) => {
+        const row = document.createElement('div');
+        row.className = 'keyframe';
+        row.innerHTML = `<span>${frame.time.toFixed(2)}s · X ${Math.round(THREE.MathUtils.radToDeg(frame.rotation.x))}° / Y ${Math.round(THREE.MathUtils.radToDeg(frame.rotation.y))}° / Z ${Math.round(THREE.MathUtils.radToDeg(frame.rotation.z))}°</span>`;
+        const remove = document.createElement('button');
+        remove.className = 'button danger';
+        remove.textContent = '删除';
+        remove.addEventListener('click', () => {
+          keyframes = keyframes.filter((item) => item !== frame);
+          renderKeyframeList();
+          updateStats();
+        });
+        row.appendChild(remove);
+        list.appendChild(row);
+      });
+      readouts.keyframeCount.textContent = keyframes.length;
+    }
+
+    function rotationAtTime(time) {
+      const frames = sortedKeyframes();
+      if (!frames.length) return null;
+      if (frames.length === 1 || time <= frames[0].time) return frames[0].rotation;
+      const last = frames[frames.length - 1];
+      if (time >= last.time) return last.rotation;
+      for (let index = 0; index < frames.length - 1; index += 1) {
+        const a = frames[index];
+        const b = frames[index + 1];
+        if (time >= a.time && time <= b.time) {
+          const span = Math.max(0.001, b.time - a.time);
+          const t = (time - a.time) / span;
+          return {
+            x: THREE.MathUtils.lerp(a.rotation.x, b.rotation.x, t),
+            y: THREE.MathUtils.lerp(a.rotation.y, b.rotation.y, t),
+            z: THREE.MathUtils.lerp(a.rotation.z, b.rotation.z, t),
+          };
+        }
+      }
+      return last.rotation;
+    }
+
+    function scrubKeyframesAt(time) {
+      if (!currentModel || keyframePlaying) return;
+      const rotation = rotationAtTime(time);
+      if (!rotation) return;
+      currentModel.rotation.set(rotation.x, rotation.y, rotation.z);
+      baseRotation.copy(currentModel.rotation);
+    }
+
+    function addKeyframe() {
+      if (!currentModel) {
+        showToast('先上传模型。');
+        return;
+      }
+      const time = Number(controlsEl.keyframeTime.value);
+      const existing = keyframes.find((frame) => Math.abs(frame.time - time) < 0.001);
+      const rotation = { x: currentModel.rotation.x, y: currentModel.rotation.y, z: currentModel.rotation.z };
+      if (existing) {
+        existing.rotation = rotation;
+      } else {
+        keyframes.push({ time, rotation });
+      }
+      renderKeyframeList();
+      updateStats();
+      showToast(`已捕获 ${time.toFixed(2)}s 的模型姿态。`);
+    }
+
+    function playKeyframes() {
+      if (keyframes.length < 2) {
+        showToast('至少需要 2 个关键帧。');
+        return;
+      }
+      keyframePlaying = !keyframePlaying;
+      keyframePlayhead = keyframePlaying ? 0 : keyframePlayhead;
+      isAutoRotate = false;
+      showToast(keyframePlaying ? '关键帧时间轴已播放。' : '关键帧时间轴已暂停。');
+    }
+
+    function clearKeyframes() {
+      keyframes = [];
+      keyframePlaying = false;
+      keyframePlayhead = 0;
+      renderKeyframeList();
+      updateStats();
+      showToast('关键帧已清空。');
+    }
+
+    function applyKeyframeAnimation(delta) {
+      if (!currentModel || !keyframePlaying || keyframes.length < 2) return;
+      const frames = sortedKeyframes();
+      const duration = Math.max(0.1, frames[frames.length - 1].time);
+      keyframePlayhead = (keyframePlayhead + delta) % duration;
+      controlsEl.keyframeTime.value = String(Math.min(Number(controlsEl.keyframeTime.max), keyframePlayhead));
+      readouts.keyframeTime.textContent = keyframePlayhead.toFixed(2);
+      const rotation = rotationAtTime(keyframePlayhead);
+      if (rotation) currentModel.rotation.set(rotation.x, rotation.y, rotation.z);
+    }
+
+    function bindDropZone() {
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        modelDrop.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          modelDrop.classList.add('drag');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        modelDrop.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          modelDrop.classList.remove('drag');
+        });
+      });
+      modelDrop.addEventListener('drop', (event) => {
+        const files = event.dataTransfer.files;
+        if (files?.length) loadAssetBundle(files);
+      });
+      viewport.addEventListener('dragover', (event) => event.preventDefault());
+      viewport.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const files = [...event.dataTransfer.files];
+        if (files.length) loadAssetBundle(files);
+      });
+    }
+
+    modelInput.addEventListener('change', () => {
+      if (modelInput.files?.length) loadAssetBundle(modelInput.files);
+      modelInput.value = '';
+    });
+
+    folderInput.addEventListener('change', () => {
+      if (folderInput.files?.length) loadAssetBundle(folderInput.files);
+      folderInput.value = '';
+    });
+
+    textureInput.addEventListener('change', () => {
+      [...textureInput.files].forEach((file) => loadTextureFile(file));
+      textureInput.value = '';
+    });
+
+    singleTextureInput.addEventListener('change', () => {
+      const file = singleTextureInput.files?.[0];
+      if (file) loadTextureFile(file, document.querySelector('#mapType').value);
+      singleTextureInput.value = '';
+    });
+
+    normalTextureInput.addEventListener('change', () => {
+      const file = normalTextureInput.files?.[0];
+      if (file) loadTextureFile(file, 'normalMap');
+      normalTextureInput.value = '';
+    });
+
+    document.querySelector('#frameButton').addEventListener('click', frameModel);
+    document.querySelector('#folderButton').addEventListener('click', () => folderInput.click());
+    document.querySelector('#clearButton').addEventListener('click', clearModel);
+    document.querySelector('#normalChannelButton').addEventListener('click', () => normalTextureInput.click());
+    document.querySelector('#clearNormalButton').addEventListener('click', () => removeTexture('normalMap'));
+    document.querySelector('#autoRotateButton').addEventListener('click', () => {
+      isAutoRotate = !isAutoRotate;
+      if (currentModel && isAutoRotate) {
+        baseRotation.copy(currentModel.rotation);
+        animationTime = 0;
+      }
+      showToast(isAutoRotate ? '动画已开启，模型按自身轴运动。' : '动画已关闭。');
+    });
+    document.querySelector('#wireButton').addEventListener('click', wireframeToggle);
+    document.querySelector('#gridButton').addEventListener('click', () => {
+      grid.visible = !grid.visible;
+      showToast(grid.visible ? '网格已显示。' : '网格已隐藏。');
+    });
+    document.querySelector('#screenshotButton').addEventListener('click', screenshot);
+    document.querySelector('#bakeButton').addEventListener('click', bakeTexture);
+    document.querySelector('#downloadBakeButton').addEventListener('click', () => {
+      if (!lastBakeUrl) {
+        showToast('还没有烘焙贴图。');
+        return;
+      }
+      download(lastBakeUrl, 'baked-preview.png');
+    });
+    document.querySelector('#playClipButton').addEventListener('click', playSelectedClip);
+    document.querySelector('#stopClipButton').addEventListener('click', stopSelectedClip);
+    document.querySelector('#addKeyframeButton').addEventListener('click', addKeyframe);
+    document.querySelector('#playKeyframesButton').addEventListener('click', playKeyframes);
+    document.querySelector('#clearKeyframesButton').addEventListener('click', clearKeyframes);
+
+    Object.values(controlsEl).forEach((control) => {
+      control.addEventListener('input', () => {
+        applyMaterialControls();
+        setBackground(controlsEl.backgroundMode.value);
+      });
+      control.addEventListener('change', () => {
+        applyMaterialControls();
+        setBackground(controlsEl.backgroundMode.value);
+      });
+    });
+
+    controlsEl.materialTarget.addEventListener('change', () => {
+      renderTextureList();
+      applyMaterialControls();
+    });
+
+    controlsEl.animationMode.addEventListener('change', () => {
+      if (currentModel) {
+        baseRotation.copy(currentModel.rotation);
+        animationTime = 0;
+      }
+    });
+
+    controlsEl.clipSelect.addEventListener('change', () => {
+      if (currentClipAction) playSelectedClip();
+    });
+
+    controlsEl.clipSpeed.addEventListener('input', () => {
+      if (currentClipAction) currentClipAction.setEffectiveTimeScale(Number(controlsEl.clipSpeed.value));
+    });
+
+    controlsEl.keyframeTime.addEventListener('input', () => {
+      updateReadouts();
+      scrubKeyframesAt(Number(controlsEl.keyframeTime.value));
+    });
+
+    window.addEventListener('resize', () => {
+      const width = viewport.clientWidth;
+      const height = viewport.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      applyKeyframeAnimation(delta);
+      applyModelAnimation(delta);
+      if (currentMixer) currentMixer.update(delta);
+      orbit.update();
+      renderer.render(scene, camera);
+    }
+
+    bindDropZone();
+    renderTextureList();
+    renderKeyframeList();
+    updateReadouts();
+    updateStats();
+    setBackground('hyper');
+    animate();
+  </script>
+</body>
+</html>

@@ -360,6 +360,7 @@
       border-radius: 6px;
       background: rgba(235, 241, 250, .88);
       object-fit: cover;
+      cursor: pointer;
     }
 
     .stats {
@@ -408,6 +409,80 @@
     .toast.show {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
+    }
+
+    .progress {
+      position: absolute;
+      left: 50%;
+      top: 68px;
+      width: min(420px, calc(100vw - 40px));
+      height: 6px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .55);
+      box-shadow: var(--shadow);
+      transform: translateX(-50%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+
+    .progress.show {
+      opacity: 1;
+    }
+
+    .progress span {
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent-2), var(--accent));
+      transition: width .18s ease;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      place-items: center;
+      padding: 28px;
+      background: rgba(25, 35, 52, .34);
+      backdrop-filter: blur(18px);
+    }
+
+    .modal.show {
+      display: grid;
+    }
+
+    .modal-inner {
+      width: min(900px, 96vw);
+      max-height: 88vh;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.42);
+      border-radius: 12px;
+      background: rgba(255,255,255,.84);
+      box-shadow: var(--shadow);
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .modal img {
+      display: block;
+      width: 100%;
+      max-height: 72vh;
+      object-fit: contain;
+      border-radius: 8px;
+      background: rgba(235, 241, 250, .88);
     }
 
     @media (max-width: 1040px) {
@@ -489,8 +564,10 @@
     <main id="viewport">
       <div class="toolbar">
         <button class="button pill" id="autoRotateButton">动画</button>
+        <button class="button pill" id="resetViewButton">重置视角</button>
         <button class="button pill" id="wireButton">线框</button>
         <button class="button pill" id="gridButton">网格</button>
+        <button class="button pill" id="performanceButton">性能</button>
         <button class="button pill" id="fullscreenButton">全屏</button>
         <button class="button pill" id="screenshotButton">截图</button>
         <button class="button pill primary" id="bakeButton">烘焙贴图</button>
@@ -502,6 +579,7 @@
           上传模型后可旋转、缩放、替换贴图，并把当前材质合成为一张可下载的烘焙预览贴图。
         </div>
       </div>
+      <div class="progress" id="loadProgress"><span></span></div>
       <div class="toast" id="toast"></div>
     </main>
 
@@ -520,6 +598,11 @@
           </select>
           <div class="hint">贴图、颜色、粗糙度、金属度会应用到选中的材质。</div>
         </div>
+        <div class="button-row">
+          <button class="button" id="showAllMaterialsButton">显示全部</button>
+          <button class="button" id="isolateMaterialButton">独显材质</button>
+        </div>
+        <button class="button danger" id="hideMaterialButton" style="width: 100%; margin-top: 8px;">隐藏目标材质</button>
         <div class="row">
           <label>基础颜色</label>
           <input id="baseColor" type="color" value="#ffffff" />
@@ -553,6 +636,7 @@
           </select>
           <div class="hint">如果凹凸方向看起来反了，切换这个选项。</div>
         </div>
+        <button class="button" id="resetMaterialButton" style="width: 100%;">重置材质参数</button>
       </section>
 
       <section class="section">
@@ -674,10 +758,22 @@
           <label>Z 位置 <span id="lightZValue">3.0</span></label>
           <input id="lightZ" type="range" min="-8" max="8" step="0.1" value="3" />
         </div>
+        <button class="button" id="resetLightButton" style="width: 100%;">重置灯光</button>
       </section>
 
       <section class="section">
-        <h2>烘焙设置</h2>
+        <h2>导出设置</h2>
+        <div class="row">
+          <label>截图倍率</label>
+          <select id="screenshotScale">
+            <option value="1">1x</option>
+            <option value="2" selected>2x</option>
+            <option value="4">4x</option>
+          </select>
+        </div>
+        <div class="row">
+          <label><input id="transparentShot" type="checkbox" /> 透明截图背景</label>
+        </div>
         <div class="row">
           <label>输出尺寸</label>
           <select id="bakeSize">
@@ -706,6 +802,15 @@
       </section>
     </aside>
   </div>
+  <div class="modal" id="textureModal">
+    <div class="modal-inner">
+      <div class="modal-head">
+        <span id="textureModalTitle">贴图预览</span>
+        <button class="button" id="closeTextureModal">关闭</button>
+      </div>
+      <img id="textureModalImage" alt="贴图预览" />
+    </div>
+  </div>
 
   <script type="importmap">
     {
@@ -727,6 +832,11 @@
     const empty = document.querySelector('#empty');
     const statusEl = document.querySelector('#status');
     const toastEl = document.querySelector('#toast');
+    const loadProgress = document.querySelector('#loadProgress');
+    const loadProgressBar = document.querySelector('#loadProgress span');
+    const textureModal = document.querySelector('#textureModal');
+    const textureModalTitle = document.querySelector('#textureModalTitle');
+    const textureModalImage = document.querySelector('#textureModalImage');
     const modelDrop = document.querySelector('#modelDrop');
     const modelInput = document.querySelector('#modelInput');
     const folderInput = document.querySelector('#folderInput');
@@ -763,6 +873,8 @@
       backgroundMode: document.querySelector('#backgroundMode'),
       bakeSize: document.querySelector('#bakeSize'),
       aoStrength: document.querySelector('#aoStrength'),
+      screenshotScale: document.querySelector('#screenshotScale'),
+      transparentShot: document.querySelector('#transparentShot'),
     };
 
     const readouts = {
@@ -853,6 +965,8 @@
     let keyframes = [];
     let keyframePlaying = false;
     let keyframePlayhead = 0;
+    let performanceMode = false;
+    let savedBackgroundMode = 'hyper';
     const skyTextures = new Map();
     const baseRotation = new THREE.Euler();
     const clock = new THREE.Clock();
@@ -871,6 +985,21 @@
       const base = clean.split('/').pop()?.toLowerCase();
       return assetUrls.get(key) || assetUrls.get(base) || url;
     });
+    manager.onStart = () => {
+      loadProgress.classList.add('show');
+      loadProgressBar.style.width = '8%';
+    };
+    manager.onProgress = (_url, loaded, total) => {
+      const ratio = total ? Math.min(100, Math.max(8, (loaded / total) * 100)) : 45;
+      loadProgressBar.style.width = `${ratio}%`;
+    };
+    manager.onLoad = () => {
+      loadProgressBar.style.width = '100%';
+      window.setTimeout(() => loadProgress.classList.remove('show'), 450);
+    };
+    manager.onError = () => {
+      loadProgress.classList.remove('show');
+    };
 
     const slotLabels = {
       map: 'Base Color',
@@ -899,6 +1028,11 @@
 
     function setStatus(message) {
       statusEl.textContent = message;
+    }
+
+    function setRendererPixelRatio() {
+      renderer.setPixelRatio(performanceMode ? 1 : Math.min(window.devicePixelRatio, 2));
+      resizeRenderer();
     }
 
     function updateReadouts() {
@@ -957,6 +1091,12 @@
       const materials = materialsOf(currentModel);
       if (target === 'all') return materials;
       return materials.filter((mat) => mat.userData.viewerMaterialId === target);
+    }
+
+    function meshUsesTargetMaterial(mesh, target) {
+      if (target === 'all') return true;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      return mats.some((mat) => mat?.userData.viewerMaterialId === target);
     }
 
     function refreshMaterialTargets() {
@@ -1188,11 +1328,43 @@
         row.className = 'tex';
         const img = document.createElement(item ? 'img' : 'div');
         img.className = 'swatch';
-        if (item) img.src = item.previewUrl || item.texture.image?.src || '';
+        if (item) {
+          img.src = item.previewUrl || item.texture.image?.src || '';
+          img.title = '点击放大预览';
+          img.addEventListener('click', () => openTexturePreview(label, item));
+        }
         row.innerHTML = `<div><b>${label}</b><small>${item ? item.fileName : '未设置'}</small></div>`;
         row.appendChild(img);
         textureList.appendChild(row);
       });
+    }
+
+    function openTexturePreview(label, item) {
+      const src = item.previewUrl || item.texture.image?.src;
+      if (!src) return;
+      textureModalTitle.textContent = `${label} · ${item.fileName}`;
+      textureModalImage.src = src;
+      textureModal.classList.add('show');
+    }
+
+    function closeTexturePreview() {
+      textureModal.classList.remove('show');
+      textureModalImage.removeAttribute('src');
+    }
+
+    function setMaterialVisibility(mode) {
+      if (!currentModel) {
+        showToast('先上传模型。');
+        return;
+      }
+      const target = selectedMaterialKey();
+      currentModel.traverse((node) => {
+        if (!node.isMesh) return;
+        if (mode === 'showAll' || target === 'all') node.visible = true;
+        if (mode === 'hide' && target !== 'all' && meshUsesTargetMaterial(node, target)) node.visible = false;
+        if (mode === 'isolate' && target !== 'all') node.visible = meshUsesTargetMaterial(node, target);
+      });
+      showToast(mode === 'showAll' ? '已显示全部材质。' : mode === 'hide' ? '已隐藏目标材质。' : '已独显目标材质。');
     }
 
     function clearModel(options = {}) {
@@ -1509,9 +1681,29 @@
     }
 
     function screenshot() {
+      const scale = Number(controlsEl.screenshotScale.value);
+      const transparent = controlsEl.transparentShot.checked;
+      const width = viewport.clientWidth;
+      const height = viewport.clientHeight;
+      const oldBackground = scene.background;
+      const oldClearAlpha = renderer.getClearAlpha();
+      const oldClearColor = renderer.getClearColor(new THREE.Color());
+      const oldPixelRatio = renderer.getPixelRatio();
+
+      renderer.setPixelRatio(1);
+      renderer.setSize(width * scale, height * scale, false);
+      if (transparent) {
+        scene.background = null;
+        renderer.setClearColor(0x000000, 0);
+      }
       renderer.render(scene, camera);
       const url = renderer.domElement.toDataURL('image/png');
-      download(url, 'model-screenshot.png');
+      download(url, `model-screenshot-${scale}x${transparent ? '-transparent' : ''}.png`);
+
+      scene.background = oldBackground;
+      renderer.setClearColor(oldClearColor, oldClearAlpha);
+      renderer.setPixelRatio(oldPixelRatio);
+      renderer.setSize(width, height, false);
     }
 
     function resizeRenderer() {
@@ -1526,6 +1718,52 @@
       isWireframe = !isWireframe;
       applyMaterialControls();
       showToast(isWireframe ? '线框已开启。' : '线框已关闭。');
+    }
+
+    function resetMaterialControls() {
+      controlsEl.materialTarget.value = 'all';
+      controlsEl.baseColor.value = '#ffffff';
+      controlsEl.roughness.value = '0.72';
+      controlsEl.metalness.value = '0.08';
+      controlsEl.normalScale.value = '1';
+      controlsEl.normalConvention.value = 'opengl';
+      setMaterialVisibility('showAll');
+      applyMaterialControls();
+      renderTextureList();
+      showToast('材质参数已重置。');
+    }
+
+    function resetLightControls() {
+      controlsEl.ambient.value = '1.2';
+      controlsEl.keyLight.value = '3.6';
+      controlsEl.backgroundMode.value = 'hyper';
+      controlsEl.customLightEnabled.checked = true;
+      controlsEl.customLightColor.value = '#ffffff';
+      controlsEl.customLightIntensity.value = '2';
+      controlsEl.customLightDistance.value = '8';
+      controlsEl.lightX.value = '2.5';
+      controlsEl.lightY.value = '3.5';
+      controlsEl.lightZ.value = '3';
+      applyMaterialControls();
+      setBackground('hyper');
+      showToast('灯光已重置。');
+    }
+
+    function togglePerformanceMode() {
+      performanceMode = !performanceMode;
+      const button = document.querySelector('#performanceButton');
+      button.textContent = performanceMode ? '高质' : '性能';
+      if (performanceMode) {
+        savedBackgroundMode = controlsEl.backgroundMode.value;
+        grid.visible = false;
+        isAutoRotate = false;
+        setBackground('transparent');
+      } else {
+        grid.visible = true;
+        setBackground(savedBackgroundMode || 'hyper');
+      }
+      setRendererPixelRatio();
+      showToast(performanceMode ? '性能模式已开启。' : '高质量预览已恢复。');
     }
 
     function curveValue(t, style) {
@@ -1765,8 +2003,14 @@
     document.querySelector('#frameButton').addEventListener('click', frameModel);
     document.querySelector('#folderButton').addEventListener('click', () => folderInput.click());
     document.querySelector('#clearButton').addEventListener('click', clearModel);
+    document.querySelector('#showAllMaterialsButton').addEventListener('click', () => setMaterialVisibility('showAll'));
+    document.querySelector('#isolateMaterialButton').addEventListener('click', () => setMaterialVisibility('isolate'));
+    document.querySelector('#hideMaterialButton').addEventListener('click', () => setMaterialVisibility('hide'));
+    document.querySelector('#resetMaterialButton').addEventListener('click', resetMaterialControls);
+    document.querySelector('#resetLightButton').addEventListener('click', resetLightControls);
     document.querySelector('#normalChannelButton').addEventListener('click', () => normalTextureInput.click());
     document.querySelector('#clearNormalButton').addEventListener('click', () => removeTexture('normalMap'));
+    document.querySelector('#resetViewButton').addEventListener('click', frameModel);
     document.querySelector('#autoRotateButton').addEventListener('click', () => {
       isAutoRotate = !isAutoRotate;
       if (currentModel && isAutoRotate) {
@@ -1780,6 +2024,7 @@
       grid.visible = !grid.visible;
       showToast(grid.visible ? '网格已显示。' : '网格已隐藏。');
     });
+    document.querySelector('#performanceButton').addEventListener('click', togglePerformanceMode);
     document.querySelector('#fullscreenButton').addEventListener('click', () => {
       const app = document.querySelector('.app');
       const enabled = app.classList.toggle('focus-mode');
@@ -1800,6 +2045,10 @@
     document.querySelector('#addKeyframeButton').addEventListener('click', addKeyframe);
     document.querySelector('#playKeyframesButton').addEventListener('click', playKeyframes);
     document.querySelector('#clearKeyframesButton').addEventListener('click', clearKeyframes);
+    document.querySelector('#closeTextureModal').addEventListener('click', closeTexturePreview);
+    textureModal.addEventListener('click', (event) => {
+      if (event.target === textureModal) closeTexturePreview();
+    });
 
     Object.values(controlsEl).forEach((control) => {
       control.addEventListener('input', () => {

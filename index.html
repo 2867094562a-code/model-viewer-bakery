@@ -45,6 +45,14 @@
       height: 100vh;
     }
 
+    .app.focus-mode {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .app.focus-mode aside {
+      display: none;
+    }
+
     aside {
       min-width: 0;
       border-right: 1px solid var(--line);
@@ -483,6 +491,7 @@
         <button class="button pill" id="autoRotateButton">动画</button>
         <button class="button pill" id="wireButton">线框</button>
         <button class="button pill" id="gridButton">网格</button>
+        <button class="button pill" id="fullscreenButton">全屏</button>
         <button class="button pill" id="screenshotButton">截图</button>
         <button class="button pill primary" id="bakeButton">烘焙贴图</button>
         <span class="pill viewport-status" id="status">等待模型</span>
@@ -1505,6 +1514,14 @@
       download(url, 'model-screenshot.png');
     }
 
+    function resizeRenderer() {
+      const width = viewport.clientWidth;
+      const height = viewport.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
     function wireframeToggle() {
       isWireframe = !isWireframe;
       applyMaterialControls();
@@ -1763,6 +1780,12 @@
       grid.visible = !grid.visible;
       showToast(grid.visible ? '网格已显示。' : '网格已隐藏。');
     });
+    document.querySelector('#fullscreenButton').addEventListener('click', () => {
+      const app = document.querySelector('.app');
+      const enabled = app.classList.toggle('focus-mode');
+      document.querySelector('#fullscreenButton').textContent = enabled ? '退出' : '全屏';
+      window.setTimeout(resizeRenderer, 60);
+    });
     document.querySelector('#screenshotButton').addEventListener('click', screenshot);
     document.querySelector('#bakeButton').addEventListener('click', bakeTexture);
     document.querySelector('#downloadBakeButton').addEventListener('click', () => {
@@ -1815,11 +1838,7 @@
     });
 
     window.addEventListener('resize', () => {
-      const width = viewport.clientWidth;
-      const height = viewport.clientHeight;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
+      resizeRenderer();
     });
 
     function animate() {

@@ -637,6 +637,34 @@
             <option value="transparent">Transparent</option>
           </select>
         </div>
+        <div class="row">
+          <label><input id="customLightEnabled" type="checkbox" checked /> 可调补光</label>
+          <div class="hint">开启后会在场景中显示一个小光球，代表补光位置。</div>
+        </div>
+        <div class="row">
+          <label>补光颜色</label>
+          <input id="customLightColor" type="color" value="#ffffff" />
+        </div>
+        <div class="row">
+          <label>补光强度 <span id="customLightValue">2.00</span></label>
+          <input id="customLightIntensity" type="range" min="0" max="10" step="0.01" value="2" />
+        </div>
+        <div class="row">
+          <label>补光距离 <span id="customLightDistanceValue">8.0</span></label>
+          <input id="customLightDistance" type="range" min="0" max="30" step="0.1" value="8" />
+        </div>
+        <div class="row">
+          <label>X 位置 <span id="lightXValue">2.5</span></label>
+          <input id="lightX" type="range" min="-8" max="8" step="0.1" value="2.5" />
+        </div>
+        <div class="row">
+          <label>Y 位置 <span id="lightYValue">3.5</span></label>
+          <input id="lightY" type="range" min="-4" max="10" step="0.1" value="3.5" />
+        </div>
+        <div class="row">
+          <label>Z 位置 <span id="lightZValue">3.0</span></label>
+          <input id="lightZ" type="range" min="-8" max="8" step="0.1" value="3" />
+        </div>
       </section>
 
       <section class="section">
@@ -714,6 +742,13 @@
       clipSelect: document.querySelector('#clipSelect'),
       clipSpeed: document.querySelector('#clipSpeed'),
       keyframeTime: document.querySelector('#keyframeTime'),
+      customLightEnabled: document.querySelector('#customLightEnabled'),
+      customLightColor: document.querySelector('#customLightColor'),
+      customLightIntensity: document.querySelector('#customLightIntensity'),
+      customLightDistance: document.querySelector('#customLightDistance'),
+      lightX: document.querySelector('#lightX'),
+      lightY: document.querySelector('#lightY'),
+      lightZ: document.querySelector('#lightZ'),
       ambient: document.querySelector('#ambient'),
       keyLight: document.querySelector('#keyLight'),
       backgroundMode: document.querySelector('#backgroundMode'),
@@ -731,6 +766,11 @@
       curveZ: document.querySelector('#curveZValue'),
       clipSpeed: document.querySelector('#clipSpeedValue'),
       keyframeTime: document.querySelector('#keyframeTimeValue'),
+      customLight: document.querySelector('#customLightValue'),
+      customLightDistance: document.querySelector('#customLightDistanceValue'),
+      lightX: document.querySelector('#lightXValue'),
+      lightY: document.querySelector('#lightYValue'),
+      lightZ: document.querySelector('#lightZValue'),
       ambient: document.querySelector('#ambientValue'),
       keyLight: document.querySelector('#keyValue'),
       aoStrength: document.querySelector('#aoValue'),
@@ -775,6 +815,15 @@
     const fillLight = new THREE.DirectionalLight(0xaed8ff, 1.1);
     fillLight.position.set(-4, 2, -3);
     scene.add(fillLight);
+    const customLight = new THREE.PointLight(0xffffff, 2, 8, 1.2);
+    customLight.position.set(2.5, 3.5, 3);
+    scene.add(customLight);
+    const lightMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    lightMarker.position.copy(customLight.position);
+    scene.add(lightMarker);
 
     const grid = new THREE.GridHelper(12, 24, 0x7f8796, 0x363b45);
     grid.position.y = -0.001;
@@ -853,6 +902,11 @@
       readouts.curveZ.textContent = controlsEl.curveZ.value;
       readouts.clipSpeed.textContent = Number(controlsEl.clipSpeed.value).toFixed(2);
       readouts.keyframeTime.textContent = Number(controlsEl.keyframeTime.value).toFixed(2);
+      readouts.customLight.textContent = Number(controlsEl.customLightIntensity.value).toFixed(2);
+      readouts.customLightDistance.textContent = Number(controlsEl.customLightDistance.value).toFixed(1);
+      readouts.lightX.textContent = Number(controlsEl.lightX.value).toFixed(1);
+      readouts.lightY.textContent = Number(controlsEl.lightY.value).toFixed(1);
+      readouts.lightZ.textContent = Number(controlsEl.lightZ.value).toFixed(1);
       readouts.ambient.textContent = Number(controlsEl.ambient.value).toFixed(2);
       readouts.keyLight.textContent = Number(controlsEl.keyLight.value).toFixed(2);
       readouts.aoStrength.textContent = Number(controlsEl.aoStrength.value).toFixed(2);
@@ -883,6 +937,10 @@
 
     function textureSlotItem(slot) {
       return textureSlots.get(textureSlotKey(slot)) || textureSlots.get(`all:${slot}`);
+    }
+
+    function releaseTextureSlotItem(item) {
+      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
     }
 
     function targetMaterials() {
@@ -1024,11 +1082,29 @@
       });
       ambientLight.intensity = Number(controlsEl.ambient.value);
       keyLight.intensity = Number(controlsEl.keyLight.value);
+      updateCustomLight();
       updateReadouts();
     }
 
-    function applyTexture(slot, texture, fileName) {
+    function updateCustomLight() {
+      const enabled = controlsEl.customLightEnabled.checked;
+      customLight.visible = enabled;
+      lightMarker.visible = enabled;
+      customLight.color.set(controlsEl.customLightColor.value);
+      customLight.intensity = enabled ? Number(controlsEl.customLightIntensity.value) : 0;
+      customLight.distance = Number(controlsEl.customLightDistance.value);
+      customLight.position.set(
+        Number(controlsEl.lightX.value),
+        Number(controlsEl.lightY.value),
+        Number(controlsEl.lightZ.value)
+      );
+      lightMarker.position.copy(customLight.position);
+      lightMarker.material.color.copy(customLight.color);
+    }
+
+    function applyTexture(slot, texture, fileName, previewUrl = '') {
       if (!currentModel) {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         showToast('先上传模型，再贴图。');
         return;
       }
@@ -1054,7 +1130,9 @@
         }
         mat.needsUpdate = true;
       });
-      textureSlots.set(textureSlotKey(slot), { texture, fileName });
+      const key = textureSlotKey(slot);
+      releaseTextureSlotItem(textureSlots.get(key));
+      textureSlots.set(key, { texture, fileName, previewUrl: previewUrl || texture.image?.src || '' });
       renderTextureList();
       updateStats();
       showToast(`${slotLabels[slot]} 已应用：${fileName}`);
@@ -1069,7 +1147,9 @@
         if (mat[slot]) mat[slot] = null;
         mat.needsUpdate = true;
       });
-      textureSlots.delete(textureSlotKey(slot));
+      const key = textureSlotKey(slot);
+      releaseTextureSlotItem(textureSlots.get(key));
+      textureSlots.delete(key);
       renderTextureList();
       updateStats();
       showToast(`${slotLabels[slot]} 已移除。`);
@@ -1083,9 +1163,9 @@
     function loadTextureFile(file, forcedSlot) {
       const url = URL.createObjectURL(file);
       textureLoader.load(url, (texture) => {
-        applyTexture(forcedSlot || guessSlot(file.name), texture, file.name);
-        URL.revokeObjectURL(url);
+        applyTexture(forcedSlot || guessSlot(file.name), texture, file.name, url);
       }, undefined, (error) => {
+        URL.revokeObjectURL(url);
         console.error(error);
         showToast(`贴图读取失败：${file.name}`);
       });
@@ -1099,7 +1179,7 @@
         row.className = 'tex';
         const img = document.createElement(item ? 'img' : 'div');
         img.className = 'swatch';
-        if (item) img.src = item.texture.image?.src || '';
+        if (item) img.src = item.previewUrl || item.texture.image?.src || '';
         row.innerHTML = `<div><b>${label}</b><small>${item ? item.fileName : '未设置'}</small></div>`;
         row.appendChild(img);
         textureList.appendChild(row);
@@ -1126,6 +1206,7 @@
       currentModelExt = '';
       baseRotation.set(0, 0, 0);
       animationTime = 0;
+      textureSlots.forEach((item) => releaseTextureSlotItem(item));
       textureSlots.clear();
       materialRegistry = [];
       controlsEl.materialTarget.innerHTML = '<option value="all">全部材质</option>';
@@ -1402,7 +1483,7 @@
         textureLoader.load(lastBakeUrl, (texture) => {
           texture.colorSpace = THREE.SRGBColorSpace;
           texture.flipY = false;
-          applyTexture('map', texture, 'baked-preview.png');
+          applyTexture('map', texture, 'baked-preview.png', lastBakeUrl);
           showToast('已生成烘焙预览贴图，可下载 PNG。');
         });
       }, 'image/png');
